@@ -111,6 +111,8 @@ class LinearRegression:
         s_inv = np.zeros(len(s))
 
         for i in range(self.number_of_singulars):
+            if i > len(s) - 1:
+                break
             if s[i] != 0:
                 s_inv[i] = 1 / s[i]
 
@@ -159,7 +161,7 @@ class LinearRegression:
                 ss_tot += (y_test[i] - np.mean(y_test)) ** 2
             r2_error = 1 - ss_res / ss_tot
             square_error = np.sqrt(ss_res) / (len(y_test) - 2)
-            return square_error, r2_error
+        return square_error, r2_error
 
 
 class AssociativeLinearRegression(LinearRegression):
@@ -167,12 +169,22 @@ class AssociativeLinearRegression(LinearRegression):
     def __init__(self, x_knowledge_base, y_knowledge_base, set_number_of_singulars=-1, set_minkowski_level=2,
                  set_max_radius=np.inf, set_number_of_train_set=np.inf):
         super().__init__(set_number_of_singulars)
+
         self.X_knowledge_base = x_knowledge_base
         self.Y_knowledge_base = y_knowledge_base
 
         self.minkowski_level = set_minkowski_level
         self.max_radius = set_max_radius
         self.number_of_train_set = set_number_of_train_set
+
+    def fit_model(self, x, y):
+        ones = np.array([np.ones(len(x))])
+        x_new = np.append(x, ones.T, axis=1)
+        x_pseudo = self.__pseudo_inv__(x_new)
+        coeff = np.dot(x_pseudo, y.T)
+        free_coeff = coeff[len(coeff) - 1]
+        coeff = np.delete(coeff, len(coeff) - 1)
+        return coeff, free_coeff
 
     def __associative_set__(self, current_x):
         x_associated = np.array([])
@@ -184,7 +196,7 @@ class AssociativeLinearRegression(LinearRegression):
 
             for j in range(len(current_x)):
                 distance += abs(current_x[j] - self.X_knowledge_base[i, j]) ** self.minkowski_level
-            distance_associated = distance_associated ** (1 / self.minkowski_level)
+            distance = distance ** (1 / self.minkowski_level)
 
             if distance == 0.0:
                 continue
@@ -197,6 +209,10 @@ class AssociativeLinearRegression(LinearRegression):
                 y_associated = np.append(y_associated, self.Y_knowledge_base[i])
                 distance_associated = np.append(distance_associated, distance)
 
+        if len(y_associated) <= 1:
+            raise ArithmeticError("The restrictions are too strong, no associations found."
+                                  " Try to make set_max_radius bigger")
+
         while self.number_of_train_set < len(y_associated):
             excess = np.argmax(distance_associated)
             x_associated = np.delete(x_associated, excess, axis=0)
@@ -205,11 +221,16 @@ class AssociativeLinearRegression(LinearRegression):
         return x_associated, y_associated
 
     def predict(self, x_entry):
-        x_entry_ = np.copy(x_entry)
-        self.Coeff = np.array((x_entry.shape[0], x_entry.shape[1]))
-        self.Free_coeff = np.array(x_entry.shape[0])
+        if (len(self.X_knowledge_base) == 0) or (len(self.Y_knowledge_base) == 0):
+            print("The knowledge base is empty. Add data to knowledge base")
+            return None
+        if len(self.X_knowledge_base) != len(self.Y_knowledge_base):
+            print("Shapes of X and Y knowledge base must be equal")
+            return None
+        self.Coeff = np.zeros((x_entry.shape[0], x_entry.shape[1]))
+        self.Free_coeff = np.zeros(x_entry.shape[0])
         y_predicted = np.array([])
-        for i in range(x_entry.shape[1]):
+        for i in range(x_entry.shape[0]):
             x_associative, y_associative = self.__associative_set__(x_entry[i])
             self.Coeff[i, :], self.Free_coeff[i] = self.fit_model(x_associative, y_associative)
             y_predicted = np.append(y_predicted, np.dot(self.Coeff[i, :], x_entry[i]) + self.Free_coeff[i])
@@ -219,11 +240,17 @@ class AssociativeLinearRegression(LinearRegression):
         if x_test.shape[0] != len(y_test):
             print("Test data X and Y must be the same shape")
             return None
+        if (len(self.X_knowledge_base) == 0) or (len(self.Y_knowledge_base) == 0):
+            print("The knowledge base is empty. Add data to knowledge base")
+            return None
+        if len(self.X_knowledge_base) != len(self.Y_knowledge_base):
+            print("Shapes of X and Y knowledge base must be equal")
+            return None
         ss_res = 0
         ss_tot = 0
-        y_predicted = self.predict(x_test)
+        y_pred = self.predict(x_test)
         for i in range(len(y_test)):
-            ss_res += (y_test[i] - y_predicted[i]) ** 2
+            ss_res += (y_test[i] - y_pred[i]) ** 2
             ss_tot += (y_test[i] - np.mean(y_test)) ** 2
         self.Square_error = np.sqrt(ss_res) / (len(y_test) - 2)
         self.R2_error = 1 - ss_res / ss_tot
