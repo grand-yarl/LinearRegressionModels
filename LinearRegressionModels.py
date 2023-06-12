@@ -1,4 +1,5 @@
 import numpy as np
+import pandas as pd
 
 
 class LinearRegression:
@@ -11,13 +12,14 @@ class LinearRegression:
         self.number_of_singulars = number_of_singulars_
 
     @staticmethod
-    def prepare_data(self, dataframe, x_names_list, y_name, test_size=0.2):
+    def prepare_data(dataframe, x_names_list, y_name, test_size=0.2):
         x = dataframe[x_names_list].to_numpy()
         y = dataframe[y_name].to_numpy()
-        x_train, x_test, y_train, y_test = self.__split_train_test__(x, y, test_size=test_size)
+        x_train, x_test, y_train, y_test = LinearRegression.__split_train_test__(x, y, test_size=test_size)
         return x_train, y_train, x_test, y_test
 
-    def __split_train_test__(self, x, y, test_size=0.33):
+    @staticmethod
+    def __split_train_test__(x, y, test_size=0.33):
         number_of_test = round(len(y) * test_size)
         number_of_train = len(y) - number_of_test
         x_train = x[0: number_of_train, :]
@@ -57,6 +59,9 @@ class LinearRegression:
             print("Find coefficients for model first")
             return None
         else:
+            if x_test.shape[0] != len(y_test):
+                print("Test data X and Y must be the same shape")
+                return None
             ss_res = 0
             ss_tot = 0
             y_pred = self.predict(x_test)
