@@ -25,12 +25,13 @@ class LinearRegression:
     inputs:
         number_of_singulars - number of singular values used to find pseudo inverse matrix
     """
-    def __init__(self, number_of_singulars_=-1):
+    def __init__(self, set_number_of_singulars=-1):
         self.Coeff = np.array([])
         self.Free_coeff = None
         self.Square_error = None
         self.R2_error = None
-        self.number_of_singulars = number_of_singulars_
+
+        self.number_of_singulars = set_number_of_singulars
 
     """
     Data preparation method
@@ -82,6 +83,9 @@ class LinearRegression:
     inputs:
         x - train input sample
         y - train output sample
+    outputs:
+        Coeff - numpy array for regression coefficients list
+        Free_coeff - free regression coefficient
     """
     def fit_model(self, x, y):
         ones = np.array([np.ones(len(x))])
@@ -91,7 +95,7 @@ class LinearRegression:
         self.Free_coeff = self.Coeff[len(self.Coeff) - 1]
         self.Coeff = np.delete(self.Coeff, len(self.Coeff) - 1)
         self.Square_error, self.R2_error = self.test_error(x, y)
-        return
+        return self.Coeff, self.Free_coeff
 
     """
     Method for calculating pseudo inverse matrix (private)
@@ -105,9 +109,11 @@ class LinearRegression:
             self.number_of_singulars = np.linalg.matrix_rank(matrix)
         u, s, vt = np.linalg.svd(matrix)
         s_inv = np.zeros(len(s))
+
         for i in range(self.number_of_singulars):
             if s[i] != 0:
                 s_inv[i] = 1 / s[i]
+
         sigma = np.zeros(np.shape(matrix))
         sigma[:len(s), :len(s)] = np.diag(s_inv)
         matrix_pseudo_inv = np.dot(np.dot(vt.T, sigma.T), u.T)
@@ -156,5 +162,79 @@ class LinearRegression:
             return square_error, r2_error
 
 
+class AssociativeLinearRegression(LinearRegression):
 
+    def __init__(self, x_knowledge_base, y_knowledge_base, set_number_of_singulars=-1, set_minkowski_level=2,
+                 set_max_radius=np.inf, set_number_of_train_set=np.inf):
+        super().__init__(set_number_of_singulars)
+        self.X_knowledge_base = x_knowledge_base
+        self.Y_knowledge_base = y_knowledge_base
+
+        self.minkowski_level = set_minkowski_level
+        self.max_radius = set_max_radius
+        self.number_of_train_set = set_number_of_train_set
+
+    def __associative_set__(self, current_x):
+        x_associated = np.array([])
+        y_associated = np.array([])
+        distance_associated = np.array([])
+
+        for i in range(len(self.X_knowledge_base)):
+            distance = 0
+
+            for j in range(len(current_x)):
+                distance += abs(current_x[j] - self.X_knowledge_base[i, j]) ** self.minkowski_level
+            distance_associated = distance_associated ** (1 / self.minkowski_level)
+
+            if distance == 0.0:
+                continue
+
+            if distance <= self.max_radius:
+                if len(x_associated) == 0:
+                    x_associated = np.copy(self.X_knowledge_base[i])
+                else:
+                    x_associated = np.vstack([x_associated, self.X_knowledge_base[i]])
+                y_associated = np.append(y_associated, self.Y_knowledge_base[i])
+                distance_associated = np.append(distance_associated, distance)
+
+        while self.number_of_train_set < len(y_associated):
+            excess = np.argmax(distance_associated)
+            x_associated = np.delete(x_associated, excess, axis=0)
+            y_associated = np.delete(y_associated, excess)
+            distance_associated = np.delete(distance_associated, excess)
+        return x_associated, y_associated
+
+    def predict(self, x_entry):
+        x_entry_ = np.copy(x_entry)
+        self.Coeff = np.array((x_entry.shape[0], x_entry.shape[1]))
+        self.Free_coeff = np.array(x_entry.shape[0])
+        y_predicted = np.array([])
+        for i in range(x_entry.shape[1]):
+            x_associative, y_associative = self.__associative_set__(x_entry[i])
+            self.Coeff[i, :], self.Free_coeff[i] = self.fit_model(x_associative, y_associative)
+            y_predicted = np.append(y_predicted, np.dot(self.Coeff[i, :], x_entry[i]) + self.Free_coeff[i])
+        return y_predicted
+
+    def test_error(self, x_test, y_test):
+        if x_test.shape[0] != len(y_test):
+            print("Test data X and Y must be the same shape")
+            return None
+        ss_res = 0
+        ss_tot = 0
+        y_predicted = self.predict(x_test)
+        for i in range(len(y_test)):
+            ss_res += (y_test[i] - y_predicted[i]) ** 2
+            ss_tot += (y_test[i] - np.mean(y_test)) ** 2
+        self.Square_error = np.sqrt(ss_res) / (len(y_test) - 2)
+        self.R2_error = 1 - ss_res / ss_tot
+        return self.Square_error, self.R2_error
+
+    def update_knowledge_bases(self, x_new, y_new):
+        if x_new.shape[0] != len(y_new):
+            print("Test data X and Y must be the same shape")
+            return None
+        for i in range(len(y_new)):
+            self.X_knowledge_base = np.vstack([self.X_knowledge_base, x_new[i]])
+            self.Y_knowledge_base = np.append(self.Y_knowledge_base, y_new[i])
+        return
 
