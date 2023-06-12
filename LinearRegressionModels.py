@@ -1,31 +1,39 @@
 import numpy as np
 import pandas as pd
 
-"""
-Ordinary Linear Regression class
-attributes:
-    Coeff - numpy array for regression coefficients list
-    Free_coeff - free regression coefficient
-    Square_error - statistic square error for model on train data
-    R2_error - R2 error coefficient for model on train data
-setting variables:
-    number_of_singulars - number of singular values used to find pseudo inverse matrix
-methods:
-    static_methods:
-        prepare_data - preparing full data from dataframe to test and train samples
-    object_methods:
-        fit_model - find model coefficients on train samples
-        predict - find prediction values for input parameters
-        test_error - calculate prediction error for test samples
-"""
-class LinearRegression:
 
+class LinearRegression:
     """
-    Linear Regression class constructor
-    inputs:
-        number_of_singulars - number of singular values used to find pseudo inverse matrix
+    Ordinary Linear Regression class
+        attributes:
+            Coeff - numpy array for regression coefficients list,
+
+            Free_coeff - free regression coefficient,
+
+            Square_error - statistic square error for model on train data,
+
+            R2_error - R2 error coefficient for model on train data.
+        setting variables:
+            number_of_singulars - number of singular values used to find pseudo inverse matrix.
+        methods:
+            static_methods:
+                prepare_data - preparing full data from dataframe to test and train samples.
+
+            object_methods:
+                fit_model - find model coefficients on train samples,
+
+                predict - find prediction values for input parameters,
+
+                test_error - calculate prediction error for test samples.
     """
+
+
     def __init__(self, set_number_of_singulars=-1):
+        """
+        Linear Regression class constructor
+            inputs:
+                number_of_singulars - number of singular values used to find pseudo inverse matrix.
+        """
         self.Coeff = np.array([])
         self.Free_coeff = None
         self.Square_error = None
@@ -33,21 +41,27 @@ class LinearRegression:
 
         self.number_of_singulars = set_number_of_singulars
 
-    """
-    Data preparation method
-    inputs:
-        dataframe - pandas dataframe with full data
-        x_names_list - names of model input parameters
-        y_name - name of model output parameter
-        test_size - size of test data sample (0.2 by default)
-    outputs:
-        x_train - train input sample
-        y_train - train output sample
-        x_test - test input sample
-        y_test - test output sample
-    """
     @staticmethod
     def prepare_data(dataframe, x_names_list, y_name, test_size=0.2):
+        """
+        Data preparation method
+            inputs:
+                dataframe - pandas dataframe with full data,
+
+                x_names_list - names of model input parameters,
+
+                y_name - name of model output parameter,
+
+                test_size - size of test data sample (0.2 by default).
+            outputs:
+                x_train - train input sample,
+
+                y_train - train output sample,
+
+                x_test - test input sample,
+
+                y_test - test output sample.
+        """
         if (test_size > 1) or (test_size < 0):
             print("Test size must be from 0. to 1.")
             return None
@@ -56,20 +70,25 @@ class LinearRegression:
         x_train, x_test, y_train, y_test = LinearRegression.__split_train_test__(x, y, test_size=test_size)
         return x_train, y_train, x_test, y_test
 
-    """
-    Method for splitting full data on train and test samples (private)
-    inputs:
-        x - full input data
-        y - full output data
-        test_size - size of test data sample (0.2 by default)
-    outputs:
-        x_train - train input sample
-        y_train - train output sample
-        x_test - test input sample
-        y_test - test output sample    
-    """
     @staticmethod
     def __split_train_test__(x, y, test_size=0.33):
+        """
+        Method for splitting full data on train and test samples (private)
+            inputs:
+                x - full input data,
+
+                y - full output data,
+
+                test_size - size of test data sample (0.2 by default).
+            outputs:
+                x_train - train input sample,
+
+                y_train - train output sample,
+
+                x_test - test input sample,
+
+                y_test - test output sample.
+        """
         number_of_test = round(len(y) * test_size)
         number_of_train = len(y) - number_of_test
         x_train = x[0: number_of_train, :]
@@ -78,16 +97,18 @@ class LinearRegression:
         y_test = y[number_of_train: len(y)]
         return x_train, x_test, y_train, y_test
 
-    """
-    Method for calculating model coefficients (Coeff and Free_coeff)
-    inputs:
-        x - train input sample
-        y - train output sample
-    outputs:
-        Coeff - numpy array for regression coefficients list
-        Free_coeff - free regression coefficient
-    """
     def fit_model(self, x, y):
+        """
+        Method for calculating model coefficients (Coeff and Free_coeff)
+            inputs:
+                x - train input sample,
+
+                y - train output sample.
+            outputs:
+                Coeff - numpy array for regression coefficients list,
+
+                Free_coeff - free regression coefficient.
+        """
         ones = np.array([np.ones(len(x))])
         x_new = np.append(x, ones.T, axis=1)
         x_pseudo = self.__pseudo_inv__(x_new)
@@ -97,14 +118,14 @@ class LinearRegression:
         self.Square_error, self.R2_error = self.test_error(x, y)
         return self.Coeff, self.Free_coeff
 
-    """
-    Method for calculating pseudo inverse matrix (private)
-    input:
-        matrix - matrix, from which pseudo inverse is calculating
-    output:
-        matrix_pseudo_inv - pseudo inverse matrix
-    """
     def __pseudo_inv__(self, matrix):
+        """
+        Method for calculating pseudo inverse matrix (private)
+            input:
+                matrix - matrix, from which pseudo inverse is calculating.
+            output:
+                matrix_pseudo_inv - pseudo inverse matrix.
+        """
         if self.number_of_singulars == -1:
             self.number_of_singulars = np.linalg.matrix_rank(matrix)
         u, s, vt = np.linalg.svd(matrix)
@@ -121,14 +142,14 @@ class LinearRegression:
         matrix_pseudo_inv = np.dot(np.dot(vt.T, sigma.T), u.T)
         return matrix_pseudo_inv
 
-    """
-    Method for predicting output values
-    input:
-        x_entry - input parameters that are used for prediction
-    output:
-        y_predicted - list of predicted values
-    """
     def predict(self, x_entry):
+        """
+        Method for predicting output values
+            input:
+                x_entry - input parameters that are used for prediction.
+            output:
+                y_predicted - list of predicted values.
+        """
         if self.Free_coeff is None:
             print("Find coefficients for model first")
             return None
@@ -136,16 +157,18 @@ class LinearRegression:
             y_predicted = np.dot(self.Coeff, x_entry.T) + self.Free_coeff
             return y_predicted
 
-    """
-    Method for calculating errors on test sample
-    input:
-        x_test - test input sample
-        y_test - test output sample  
-    output:
-        square_error - square error on test sample
-        r2_error - r2 error coefficient for test sample
-    """
     def test_error(self, x_test, y_test):
+        """
+        Method for calculating errors on test sample
+            input:
+                x_test: test input sample,
+
+                y_test: test output sample.
+            output:
+                square_error: square error on test sample,
+
+                r2_error: r2 error coefficient for test sample.
+        """
         if self.Free_coeff is None:
             print("Find coefficients for model first")
             return None
@@ -165,9 +188,59 @@ class LinearRegression:
 
 
 class AssociativeLinearRegression(LinearRegression):
+    """
+    Associative Linear Regression class (Heir of LinearRegression class)
+        description:
+            For every prediction point create new model, that include associated train set,
+            regression coefficients and free coefficient. The association criterion is minkowski
+            distance between current input vector and associated vector.
+        attributes:
+            Coeff - list of regression coefficients for all point models,
 
+            Free_coeff - list of free regression coefficients for all point models,
+
+            Square_error - statistic square error for model on current test data,
+
+            R2_error - R2 error coefficient for model on current test data,
+
+            X_knowledge_base - set of input vectors, from which associative selection is performing,
+
+            Y_knowledge_base - set of output values, that is connected with X_knowledge_base.
+        setting variables:
+            number_of_singulars - number of singular values used to find pseudo inverse matrix,
+
+            minkowski_level - level for Minkowski distance. If equals 1 - Manhattan distance, 2 - Euclid distance (default),
+
+            max_radius - maximum distance, which allowed for association (infinite for default),
+
+            number_of_train_set - number of the nearest vectors, that can be associated (infinite for default).
+        methods:
+            object_methods:
+                fit_model - find model coefficients on associated set,
+
+                predict - find prediction values for input parameters,
+
+                test_error - calculate prediction error for test samples,
+
+                update_knowledge_base - Inserting the latest data to knowledge base.
+    """
     def __init__(self, x_knowledge_base, y_knowledge_base, set_number_of_singulars=-1, set_minkowski_level=2,
                  set_max_radius=np.inf, set_number_of_train_set=np.inf):
+        """
+        Associative Linear Regression class constructor
+            input
+                x_knowledge_base - set of input vectors, from which associative selection is performing,
+
+                y_knowledge_base - set of output values, that is connected with X_knowledge_base,
+
+                set_number_of_singulars - number of singular values used to find pseudo inverse matrix,
+
+                set_minkowski_level - level for Minkowski distance. If equals 1 - Manhattan distance, 2 - Euclid distance (default),
+
+                set_max_radius - maximum distance, which allowed for association (infinite for default),
+
+                set_number_of_train_set - number of the nearest vectors, that can be associated (infinite for default).
+        """
         super().__init__(set_number_of_singulars)
 
         self.X_knowledge_base = x_knowledge_base
@@ -187,6 +260,15 @@ class AssociativeLinearRegression(LinearRegression):
         return coeff, free_coeff
 
     def __associative_set__(self, current_x):
+        """
+        Method for collecting associated train set (private)
+            input:
+                current_x - current vector, for which associated set is constructing.
+            outputs:
+                x_associated - associated set of input vectors,
+
+                y_associated - associated set of output values.
+        """
         x_associated = np.array([])
         y_associated = np.array([])
         distance_associated = np.array([])
@@ -257,6 +339,13 @@ class AssociativeLinearRegression(LinearRegression):
         return self.Square_error, self.R2_error
 
     def update_knowledge_bases(self, x_new, y_new):
+        """
+        Method for inserting the latest data to knowledge base
+            inputs:
+                x_new - new set of input vectors,
+
+                y_new - new set of output values.
+        """
         if x_new.shape[0] != len(y_new):
             print("Test data X and Y must be the same shape")
             return None
