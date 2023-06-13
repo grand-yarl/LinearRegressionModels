@@ -1,6 +1,7 @@
 import numpy as np
 import pandas as pd
 import pywt
+import warnings
 
 
 class LinearRegression:
@@ -356,6 +357,46 @@ class AssociativeLinearRegression(LinearRegression):
 
 
 class WaveletAssociativeLinearRegression(AssociativeLinearRegression):
+    """
+        Wavelet Associative Linear Regression class (Heir of AssociativeLinearRegression class)
+            description:
+                The association criterion is similarity of coefficients of discrete wavelet transform
+            attributes:
+                Coeff - list of regression coefficients for all point models,
+
+                Free_coeff - list of free regression coefficients for all point models,
+
+                Square_error - statistic square error for model on current test data,
+
+                R2_error - R2 error coefficient for model on current test data,
+
+                X_knowledge_base - set of input vectors, from which associative selection is performing,
+
+                Y_knowledge_base - set of output values, that is connected with X_knowledge_base,
+
+                Dwt_coeff_list - list of discrete wavelet transform coefficients for x_knowledge_base (calculated automatically).
+            setting variables:
+                number_of_singulars - number of singular values used to find pseudo inverse matrix,
+
+                minkowski_level - level for Minkowski distance. If equals 1 - Manhattan distance, 2 - Euclid distance (default),
+
+                max_radius - maximum distance, which allowed for association (infinite for default),
+
+                number_of_train_set - number of the nearest vectors, that can be associated (infinite for default),
+
+                wavelet - type of discrete wavelet, used in discrete wavelet transform (haar wavelet for default),
+
+                dwt_depth - depth for discrete wavelet transform (1 for default).
+            methods:
+                object_methods:
+                    fit_model - find model coefficients on associated set,
+
+                    predict - find prediction values for input parameters,
+
+                    test_error - calculate prediction error for test samples,
+
+                    update_knowledge_base - Inserting the latest data to knowledge base.
+        """
 
     def __init__(self, x_knowledge_base, y_knowledge_base, set_number_of_singulars=-1, set_minkowski_level=2,
                  set_max_radius=np.inf, set_number_of_train_set=np.inf, set_wavelet="haar", set_dwt_depth=1):
@@ -374,15 +415,15 @@ class WaveletAssociativeLinearRegression(AssociativeLinearRegression):
 
                 set_number_of_train_set - number of the nearest vectors, that can be associated (infinite for default),
 
-                set_wavelet - type of discrete wavelet, used in discrete wavelet decomposition (haar wavelet for default)
+                set_wavelet - type of discrete wavelet, used in discrete wavelet transform (haar wavelet for default),
 
-                set_dwt_depth - depth for discrete wavelet decomposition (1 for default)
+                set_dwt_depth - depth for discrete wavelet transform (1 for default).
         """
         if set_wavelet not in pywt.wavelist(kind='discrete'):
             raise AttributeError("Invalid wavelet type. Check by pywt.wavelist(kind='discrete')")
 
         if len(y_knowledge_base) < 2 ** set_dwt_depth:
-            raise Warning("DWT depth is too big, it can cause coefficient error in decomposition")
+            warnings.warn("DWT depth is too big, all coefficients will experience boundary effects.")
 
         super().__init__(x_knowledge_base, y_knowledge_base, set_number_of_singulars, set_minkowski_level,
                          set_max_radius, set_number_of_train_set)
@@ -399,80 +440,78 @@ class WaveletAssociativeLinearRegression(AssociativeLinearRegression):
                 else:
                     self.Dwt_coeff_list[i][j] = np.vstack([self.Dwt_coeff_list[i][j], full_coeffs[i]])
 
+    def __associative_set__(self, current_time, x_test):
+        """
+        Method for collecting  associated by wavelet transform train set (private)
+            input:
+                current_time - current time for vector, for which associated set is constructing,
 
-def __associative_set__(self, current_time, x_test):
-    """
-    Method for collecting  associated by wavelet transform train set (private)
-        input:
-            current_time - current time for vector, for which associated set is constructing.
+                x_test - test sample, used for predicting output values.
+            outputs:
+                x_associated - associated set of input vectors,
 
-            x_test - test
-        outputs:
-            x_associated - associated set of input vectors,
+                y_associated - associated set of output values.
+        """
+        x_associated = np.array([])
+        y_associated = np.array([])
+        distance_associated = np.array([])
 
-            y_associated - associated set of output values.
-    """
-    x_associated = np.array([])
-    y_associated = np.array([])
-    distance_associated = np.array([])
-
-    current_dwt_coeff = [[0. for k in range(np.shape(x_test)[1])] for j in range(self.dwt_depth + 1)]
-    for j in range(np.shape(x_test)[1]):
-        full_coeffs = pywt.wavedec(x_test[:, j], self.wavelet, level=self.dwt_depth, mode='smooth')
-        for i in range(self.dwt_depth + 1):
-            if i == 0:
-                c = current_time // 2 ** self.dwt_depth
-            else:
-                c = current_time // 2 ** (self.dwt_depth - i + 1)
-            current_dwt_coeff[i][j] = full_coeffs[i][c]
-
-    for i in range(len(self.X_knowledge_base)):
-        distance = 0
-
-        for m in range(self.dwt_depth + 1):
-            for n in range(np.shape(x_test)[1]):
-                if m == 0:
-                    it = current_time // 2 ** self.dwt_depth
+        current_dwt_coeff = [[0. for k in range(np.shape(x_test)[1])] for j in range(self.dwt_depth + 1)]
+        for j in range(np.shape(x_test)[1]):
+            full_coeffs = pywt.wavedec(x_test[:, j], self.wavelet, level=self.dwt_depth, mode='smooth')
+            for i in range(self.dwt_depth + 1):
+                if i == 0:
+                    c = current_time // 2 ** self.dwt_depth
                 else:
-                    it = i // 2 ** (self.dwt_depth - m + 1)
-                distance += (current_dwt_coeff[m][n] - self.Dwt_coeff_list[m][n][it]) ** self.minkowski_level
-            distance = distance ** (1 / self.minkowski_level)
+                    c = current_time // 2 ** (self.dwt_depth - i + 1)
+                current_dwt_coeff[i][j] = full_coeffs[i][c]
 
-        if distance == 0.0:
-            continue
+        for i in range(len(self.X_knowledge_base)):
+            distance = 0
 
-        if distance <= self.max_radius:
-            if len(x_associated) == 0:
-                x_associated = np.copy(self.X_knowledge_base[i])
-            else:
-                x_associated = np.vstack([x_associated, self.X_knowledge_base[i]])
-            y_associated = np.append(y_associated, self.Y_knowledge_base[i])
-            distance_associated = np.append(distance_associated, distance)
+            for m in range(self.dwt_depth + 1):
+                for n in range(np.shape(x_test)[1]):
+                    if m == 0:
+                        it = current_time // 2 ** self.dwt_depth
+                    else:
+                        it = i // 2 ** (self.dwt_depth - m + 1)
+                    distance += (current_dwt_coeff[m][n] - self.Dwt_coeff_list[m][n][it]) ** self.minkowski_level
+                distance = distance ** (1 / self.minkowski_level)
 
-    if len(y_associated) <= 1:
-        raise ArithmeticError("The restrictions are too strong, no associations found."
-                              " Try to make set_max_radius bigger")
+            if distance == 0.0:
+                continue
 
-    while self.number_of_train_set < len(y_associated):
-        excess = np.argmax(distance_associated)
-        x_associated = np.delete(x_associated, excess, axis=0)
-        y_associated = np.delete(y_associated, excess)
-        distance_associated = np.delete(distance_associated, excess)
-    return x_associated, y_associated
+            if distance <= self.max_radius:
+                if len(x_associated) == 0:
+                    x_associated = np.copy(self.X_knowledge_base[i])
+                else:
+                    x_associated = np.vstack([x_associated, self.X_knowledge_base[i]])
+                y_associated = np.append(y_associated, self.Y_knowledge_base[i])
+                distance_associated = np.append(distance_associated, distance)
 
+        if len(y_associated) <= 1:
+            raise ArithmeticError("The restrictions are too strong, no associations found."
+                                  " Try to make set_max_radius bigger")
 
-def predict(self, x_entry):
-    if (len(self.X_knowledge_base) == 0) or (len(self.Y_knowledge_base) == 0):
-        print("The knowledge base is empty. Add data to knowledge base")
-        return None
-    if len(self.X_knowledge_base) != len(self.Y_knowledge_base):
-        print("Shapes of X and Y knowledge base must be equal")
-        return None
-    self.Coeff = np.zeros((x_entry.shape[0], x_entry.shape[1]))
-    self.Free_coeff = np.zeros(x_entry.shape[0])
-    y_predicted = np.array([])
-    for i in range(x_entry.shape[0]):
-        x_associative, y_associative = self.__associative_set__(i, x_entry)
-        self.Coeff[i, :], self.Free_coeff[i] = self.fit_model(x_associative, y_associative)
-        y_predicted = np.append(y_predicted, np.dot(self.Coeff[i, :], x_entry[i]) + self.Free_coeff[i])
-    return y_predicted
+        while self.number_of_train_set < len(y_associated):
+            excess = np.argmax(distance_associated)
+            x_associated = np.delete(x_associated, excess, axis=0)
+            y_associated = np.delete(y_associated, excess)
+            distance_associated = np.delete(distance_associated, excess)
+        return x_associated, y_associated
+
+    def predict(self, x_entry):
+        if (len(self.X_knowledge_base) == 0) or (len(self.Y_knowledge_base) == 0):
+            print("The knowledge base is empty. Add data to knowledge base")
+            return None
+        if len(self.X_knowledge_base) != len(self.Y_knowledge_base):
+            print("Shapes of X and Y knowledge base must be equal")
+            return None
+        self.Coeff = np.zeros((x_entry.shape[0], x_entry.shape[1]))
+        self.Free_coeff = np.zeros(x_entry.shape[0])
+        y_predicted = np.array([])
+        for i in range(x_entry.shape[0]):
+            x_associative, y_associative = self.__associative_set__(i, x_entry)
+            self.Coeff[i, :], self.Free_coeff[i] = self.fit_model(x_associative, y_associative)
+            y_predicted = np.append(y_predicted, np.dot(self.Coeff[i, :], x_entry[i]) + self.Free_coeff[i])
+        return y_predicted
