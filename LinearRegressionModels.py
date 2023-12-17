@@ -68,11 +68,11 @@ class LinearRegression:
             return None
         x = dataframe[x_names_list].to_numpy()
         y = dataframe[y_name].to_numpy()
-        x_train, x_test, y_train, y_test = LinearRegression.__split_train_test__(x, y, test_size=test_size)
+        x_train, x_test, y_train, y_test = LinearRegression.split_train_test(x, y, test_size=test_size)
         return x_train, y_train, x_test, y_test
 
     @staticmethod
-    def __split_train_test__(x, y, test_size=0.33):
+    def split_train_test(x, y, test_size=0.33):
         """
         Method for splitting full data on train and test samples (private)
             inputs:
@@ -132,11 +132,14 @@ class LinearRegression:
         u, s, vt = np.linalg.svd(matrix)
         s_inv = np.zeros(len(s))
 
+        sum_s = 0
         for i in range(self.number_of_singulars):
-            if i > len(s) - 1:
+            sum_s += s[i]
+            if i > len(s) - 1 or s[i] / sum_s < 1e-3:
                 break
             if s[i] != 0:
                 s_inv[i] = 1 / s[i]
+
 
         sigma = np.zeros(np.shape(matrix))
         sigma[:len(s), :len(s)] = np.diag(s_inv)
@@ -276,9 +279,12 @@ class AssociativeLinearRegression(LinearRegression):
 
         for i in range(len(self.X_knowledge_base)):
             distance = 0
-
             for j in range(len(current_x)):
-                distance += abs(current_x[j] - self.X_knowledge_base[i, j]) ** self.minkowski_level
+                minimum = np.min(self.X_knowledge_base[:, j])
+                maximum = np.max(self.X_knowledge_base[:, j])
+                norm_x_j = (current_x[j] - minimum) / (maximum - minimum)
+                knowledge_x_j = (self.X_knowledge_base[i, j] - minimum) / (maximum - minimum)
+                distance += (abs(norm_x_j - knowledge_x_j)) ** self.minkowski_level
             distance = distance ** (1 / self.minkowski_level)
 
             if distance == 0.0:
